@@ -2,13 +2,15 @@ package service
 
 import (
 	"context"
+	"errors"
 	"go-basic/webbook/internal/domain"
 	"go-basic/webbook/internal/repository"
 	"golang.org/x/crypto/bcrypt"
 )
 
 var (
-	ErrUserDuplicate = repository.ErrorUserDuplicate
+	ErrUserDuplicate         = repository.ErrorUserDuplicate
+	ErrInvalidUserOrPassword = errors.New("邮箱/用户名或密码错误")
 )
 
 type UserService struct {
@@ -31,4 +33,20 @@ func (svc *UserService) SignUp(ctx context.Context, u domain.User) error {
 	u.Password = string(hash)
 
 	return svc.repo.CreateUser(ctx, u)
+}
+
+func (svc *UserService) Login(ctx context.Context, email string, password string) (domain.User, error) {
+
+	user, err := svc.repo.FindByEmail(ctx, email)
+
+	if err == repository.ErrorUserNotFound {
+		return domain.User{}, ErrInvalidUserOrPassword
+	}
+	if err != nil {
+		return domain.User{}, err
+	}
+	if !user.Compare(password) {
+		return domain.User{}, ErrInvalidUserOrPassword
+	}
+	return user, nil
 }

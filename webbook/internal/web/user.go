@@ -2,6 +2,7 @@ package web
 
 import (
 	regexp "github.com/dlclark/regexp2"
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"go-basic/webbook/internal/domain"
 	"go-basic/webbook/internal/service"
@@ -95,6 +96,33 @@ func (u *UserHandler) SignUp(ctx *gin.Context) {
 // Login 用户登录
 func (u *UserHandler) Login(ctx *gin.Context) {
 
+	type loginReq struct {
+		Email    string
+		Password string
+	}
+
+	var req loginReq
+
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+
+	user, err := u.svc.Login(ctx, req.Email, req.Password)
+	if err == service.ErrInvalidUserOrPassword {
+		ctx.String(http.StatusOK, "用户名或密码不对")
+		return
+	}
+
+	if err != nil {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+
+	sess := sessions.Default(ctx)
+	sess.Set("userId", user.Id)
+	_ = sess.Save()
+	ctx.String(http.StatusOK, "登录成功")
+	return
 }
 
 // Edit 用户这是信息
