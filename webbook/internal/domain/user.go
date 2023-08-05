@@ -4,9 +4,12 @@ import "golang.org/x/crypto/bcrypt"
 
 // User 领域对象
 type User struct {
-	Id       int64
-	Email    string
-	Password string
+	Id           int64
+	Email        string
+	Password     string
+	NickName     string
+	Birthday     string
+	Introduction string
 }
 
 func (u User) Compare(password string) bool {

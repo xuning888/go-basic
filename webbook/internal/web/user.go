@@ -6,30 +6,45 @@ import (
 	"github.com/gin-gonic/gin"
 	"go-basic/webbook/internal/domain"
 	"go-basic/webbook/internal/service"
+	"go-basic/webbook/internal/util"
+	"strconv"
+
 	"net/http"
 )
 
 const (
 	// 校验邮箱格式的正则表达式
-	emailRegexPattern = "^[\\w\\.-]+@[a-zA-Z\\d\\.-]+\\.[a-zA-Z]{2,}$"
+	emailRegexPattern = `^[\\w\\.-]+@[a-zA-Z\\d\\.-]+\\.[a-zA-Z]{2,}$`
 	// 校验密码格式的正则表达式
 	passwordRegexPattern = `^(?=.*[A-Za-z])(?=.*\d)(?=.*[$@$!%*#?&])[A-Za-z\d$@$!%*#?&]{8,}$`
+	// 校验用户的昵称为长度为1 - 20
+	nicknameRegexPattern = `^.{1,20}$`
+	// 生日的格式校验
+	birthdayRegexPattern = `^\d{4}-\d{2}-\d{2}$`
+	// 自我介绍不能超过 500 个字符
+	introductionRegexPattern = `^.{1,500}$`
 )
 
 // UserHandler 定义所有跟用户有关的路由
 // 为了分组方便， 为了依赖注入
 type UserHandler struct {
-	emailExp    *regexp.Regexp
-	passwordExp *regexp.Regexp
-	svc         *service.UserService
+	emailExp        *regexp.Regexp
+	passwordExp     *regexp.Regexp
+	nicknameExp     *regexp.Regexp
+	birthdayExp     *regexp.Regexp
+	introductionExp *regexp.Regexp
+	svc             *service.UserService
 }
 
 func NewUserHandler(svc *service.UserService) *UserHandler {
 	// 将正则表达式的预编译放到 UserHandler的初始化中
 	return &UserHandler{
-		emailExp:    regexp.MustCompile(emailRegexPattern, regexp.None),
-		passwordExp: regexp.MustCompile(passwordRegexPattern, regexp.None),
-		svc:         svc,
+		emailExp:        regexp.MustCompile(emailRegexPattern, regexp.None),
+		passwordExp:     regexp.MustCompile(passwordRegexPattern, regexp.None),
+		nicknameExp:     regexp.MustCompile(nicknameRegexPattern, regexp.None),
+		birthdayExp:     regexp.MustCompile(birthdayRegexPattern, regexp.None),
+		introductionExp: regexp.MustCompile(introductionRegexPattern, regexp.None),
+		svc:             svc,
 	}
 }
 
@@ -97,8 +112,8 @@ func (u *UserHandler) SignUp(ctx *gin.Context) {
 func (u *UserHandler) Login(ctx *gin.Context) {
 
 	type loginReq struct {
-		Email    string
-		Password string
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
 
 	var req loginReq
@@ -127,12 +142,116 @@ func (u *UserHandler) Login(ctx *gin.Context) {
 
 // Edit 用户这是信息
 func (u *UserHandler) Edit(ctx *gin.Context) {
+	type EditReq struct {
+		Id           int64  `json:"id"`
+		Nickname     string `json:"nickname"`
+		Birthday     string `json:"birthday"`
+		Introduction string `json:"introduction"`
+	}
 
+	var req EditReq
+
+	if err := ctx.Bind(&req); err != nil {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+
+	if req.Id == 0 {
+		ctx.String(http.StatusOK, "系统异常")
+		return
+	}
+
+	if util.IsNotBlank(req.Nickname) {
+		validNickname, err := u.nicknameExp.MatchString(req.Nickname)
+		if err != nil {
+			ctx.String(http.StatusOK, "系统异常")
+			return
+		}
+		if !validNickname {
+			ctx.String(http.StatusOK, "昵称长度为1-20")
+			return
+		}
+	} else {
+		ctx.String(http.StatusOK, "昵称不能为空")
+		return
+	}
+
+	if util.IsNotBlank(req.Birthday) {
+		validBirthday, err := u.birthdayExp.MatchString(req.Birthday)
+		if err != nil {
+			ctx.String(http.StatusOK, "系统异常")
+			return
+		}
+		if !validBirthday {
+			ctx.String(http.StatusOK, "生日格式错误")
+			return
+		}
+	}
+
+	if util.IsNotBlank(req.Introduction) {
+		validIntroduction, err := u.introductionExp.MatchString(req.Introduction)
+		if err != nil {
+			ctx.String(http.StatusOK, "系统异常")
+			return
+		}
+		if !validIntroduction {
+			ctx.String(http.StatusOK, "自我介绍不能超过500个字")
+			return
+		}
+	}
+
+	err := u.svc.Edit(ctx, domain.User{
+		Id:           req.Id,
+		NickName:     req.Nickname,
+		Birthday:     req.Birthday,
+		Introduction: req.Introduction,
+	})
+	if err == service.ErrUserNotFound {
+		ctx.String(http.StatusOK, "系统异常")
+		return
+	}
+	if err != nil {
+		ctx.String(http.StatusOK, "系统异常")
+		return
+	}
+	ctx.String(http.StatusOK, "修改成功")
+	return
 }
 
 // Profile 返回所有用户信息
 func (u *UserHandler) Profile(ctx *gin.Context) {
 
+	id, err := strconv.ParseInt(ctx.Query("id"), 10, 64)
+	if err != nil {
+		ctx.String(http.StatusOK, "系统异常")
+		return
+	}
+
+	profile, err := u.svc.Profile(ctx, id)
+
+	if err == service.ErrUserNotFound {
+		ctx.String(http.StatusOK, "系统异常")
+		return
+	}
+
+	type ProfileRes struct {
+		Id           int64  `json:"id"`
+		Email        string `json:"email"`
+		Nickname     string `json:"nickname"`
+		Introduction string `json:"introduction"`
+		Birthday     string `json:"birthday"`
+	}
+
+	res := ProfileRes{
+		Id:           profile.Id,
+		Email:        profile.Email,
+		Nickname:     profile.NickName,
+		Introduction: profile.Introduction,
+		Birthday:     profile.Birthday,
+	}
+
+	ctx.JSON(http.StatusOK, res)
+	return
 }
 
 func (u *UserHandler) RegisterRoutes(server *gin.Engine) {

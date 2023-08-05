@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/go-sql-driver/mysql"
+	"go-basic/webbook/internal/util"
 	"gorm.io/gorm"
 	"time"
 )
@@ -46,11 +47,35 @@ func (dao *UserDAO) FindByEmail(ctx context.Context, email string) (User, error)
 	return u, err
 }
 
+func (dao *UserDAO) FindById(ctx context.Context, id int64) (User, error) {
+	var u User
+	err := dao.db.WithContext(ctx).First(&u, id).Error
+	return u, err
+}
+
+func (dao *UserDAO) UpdateById(ctx context.Context, user User) error {
+
+	tx := dao.db.WithContext(ctx).Model(&user)
+	if util.IsNotBlank(user.Nickname) {
+		tx.Update("nickname", user.Nickname)
+	}
+	if util.IsNotBlank(user.Birthday) {
+		tx.Update("birthday", user.Birthday)
+	}
+	if util.IsNotBlank(user.Introduction) {
+		tx.Update("introduction", user.Introduction)
+	}
+	return tx.Error
+}
+
 // User 直接对应数据库表
 type User struct {
-	Id       int64  `gorm:"primaryKey,autoIncrement"`
-	Email    string `gorm:"unique"`
-	Password string
-	Ctime    int64
-	Utime    int64
+	Id           int64  `gorm:"primaryKey,autoIncrement"`
+	Email        string `gorm:"unique"`
+	Password     string
+	Nickname     string
+	Birthday     string
+	Introduction string `gorm:"varchar(512)"`
+	Ctime        int64
+	Utime        int64
 }
