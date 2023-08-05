@@ -3,6 +3,8 @@ package web
 import (
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-gonic/gin"
+	"go-basic/webbook/internal/domain"
+	"go-basic/webbook/internal/service"
 	"net/http"
 )
 
@@ -18,13 +20,15 @@ const (
 type UserHandler struct {
 	emailExp    *regexp.Regexp
 	passwordExp *regexp.Regexp
+	svc         *service.UserService
 }
 
-func NewUserHandler() *UserHandler {
+func NewUserHandler(svc *service.UserService) *UserHandler {
 	// 将正则表达式的预编译放到 UserHandler的初始化中
 	return &UserHandler{
 		emailExp:    regexp.MustCompile(emailRegexPattern, regexp.None),
 		passwordExp: regexp.MustCompile(passwordRegexPattern, regexp.None),
+		svc:         svc,
 	}
 }
 
@@ -68,6 +72,24 @@ func (u *UserHandler) SignUp(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "密码必须包含数字、特殊字符，并且长度不能小于 8 位")
 		return
 	}
+
+	err = u.svc.SignUp(ctx, domain.User{
+		Email:    req.Email,
+		Password: req.Password,
+	})
+
+	if err == service.ErrUserDuplicate {
+		ctx.String(http.StatusOK, "邮箱冲突")
+		return
+	}
+
+	if err != nil {
+		ctx.String(http.StatusOK, "系统异常")
+		return
+	}
+
+	ctx.String(http.StatusOK, "注册成功")
+
 }
 
 // Login 用户登录
