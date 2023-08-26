@@ -22,6 +22,7 @@ func (l *LoginMiddlewareBuilder) IgnorePaths(path string) *LoginMiddlewareBuilde
 }
 
 func (l *LoginMiddlewareBuilder) Build() gin.HandlerFunc {
+	// 返回一个 middleware
 	return func(ctx *gin.Context) {
 		for _, path := range l.paths {
 			if ctx.Request.URL.Path == path {

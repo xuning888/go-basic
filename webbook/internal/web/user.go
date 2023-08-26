@@ -7,14 +7,12 @@ import (
 	"go-basic/webbook/internal/domain"
 	"go-basic/webbook/internal/service"
 	"go-basic/webbook/internal/util"
-	"strconv"
-
 	"net/http"
 )
 
 const (
 	// 校验邮箱格式的正则表达式
-	emailRegexPattern = `^[\\w\\.-]+@[a-zA-Z\\d\\.-]+\\.[a-zA-Z]{2,}$`
+	emailRegexPattern = `^[\w\.-]+@[a-zA-Z\d\.-]+\.[a-zA-Z]{2,}$`
 	// 校验密码格式的正则表达式
 	passwordRegexPattern = `^(?=.*[A-Za-z])(?=.*\d)(?=.*[$@$!%*#?&])[A-Za-z\d$@$!%*#?&]{8,}$`
 	// 校验用户的昵称为长度为1 - 20
@@ -105,7 +103,7 @@ func (u *UserHandler) SignUp(ctx *gin.Context) {
 	}
 
 	ctx.String(http.StatusOK, "注册成功")
-
+	return
 }
 
 // Login 用户登录
@@ -134,8 +132,16 @@ func (u *UserHandler) Login(ctx *gin.Context) {
 	}
 
 	sess := sessions.Default(ctx)
+	// Secure 表示启用 HTTP, HttpOnly: 表示
+	//sess.Options(sessions.Options{
+	//	Secure:   true,
+	//	HttpOnly: true,
+	//})
 	sess.Set("userId", user.Id)
-	_ = sess.Save()
+	err = sess.Save()
+	if err != nil {
+		ctx.String(http.StatusOK, "系统错误")
+	}
 	ctx.String(http.StatusOK, "登录成功")
 	return
 }
@@ -156,10 +162,16 @@ func (u *UserHandler) Edit(ctx *gin.Context) {
 		return
 	}
 
-	if req.Id == 0 {
+	sess := sessions.Default(ctx)
+
+	userId, _ := sess.Get("userId").(int64)
+
+	if userId == 0 {
 		ctx.String(http.StatusOK, "系统异常")
 		return
 	}
+
+	req.Id = userId
 
 	if util.IsNotBlank(req.Nickname) {
 		validNickname, err := u.nicknameExp.MatchString(req.Nickname)
@@ -221,13 +233,16 @@ func (u *UserHandler) Edit(ctx *gin.Context) {
 // Profile 返回所有用户信息
 func (u *UserHandler) Profile(ctx *gin.Context) {
 
-	id, err := strconv.ParseInt(ctx.Query("id"), 10, 64)
-	if err != nil {
+	sess := sessions.Default(ctx)
+
+	userId, ok := sess.Get("userId").(int64)
+
+	if !ok {
 		ctx.String(http.StatusOK, "系统异常")
 		return
 	}
 
-	profile, err := u.svc.Profile(ctx, id)
+	profile, err := u.svc.Profile(ctx, userId)
 
 	if err == service.ErrUserNotFound {
 		ctx.String(http.StatusOK, "系统异常")
@@ -254,6 +269,7 @@ func (u *UserHandler) Profile(ctx *gin.Context) {
 	return
 }
 
+// RegisterRoutes 注册路由以及路由对应的处理方法
 func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug := server.Group("/users")
 	ug.POST("/signup", u.SignUp)
