@@ -1,9 +1,11 @@
 package middleware
 
 import (
+	"encoding/gob"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"time"
 )
 
 type LoginMiddlewareBuilder struct {
@@ -23,6 +25,7 @@ func (l *LoginMiddlewareBuilder) IgnorePaths(path string) *LoginMiddlewareBuilde
 
 func (l *LoginMiddlewareBuilder) Build() gin.HandlerFunc {
 	// 返回一个 middleware
+	gob.Register(time.Now())
 	return func(ctx *gin.Context) {
 		for _, path := range l.paths {
 			if ctx.Request.URL.Path == path {
@@ -34,6 +37,24 @@ func (l *LoginMiddlewareBuilder) Build() gin.HandlerFunc {
 		if id == nil {
 			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return
+		}
+
+		const loginTimeKey = "update_time"
+		updateTime := sess.Get(loginTimeKey)
+		sess.Set("userId", id)
+		sess.Options(sessions.Options{
+			MaxAge: 60,
+		})
+		now := time.Now()
+		if updateTime == nil {
+			sess.Set(loginTimeKey, now)
+			_ = sess.Save()
+		} else {
+			updateTimeVal, _ := updateTime.(time.Time)
+			if now.Sub(updateTimeVal) > time.Minute {
+				sess.Set(loginTimeKey, now)
+				_ = sess.Save()
+			}
 		}
 	}
 }

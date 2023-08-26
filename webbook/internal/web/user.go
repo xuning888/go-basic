@@ -133,16 +133,16 @@ func (u *UserHandler) Login(ctx *gin.Context) {
 
 	sess := sessions.Default(ctx)
 	// Secure 表示启用 HTTP, HttpOnly: 表示
-	//sess.Options(sessions.Options{
-	//	Secure:   true,
-	//	HttpOnly: true,
-	//})
+	sess.Options(sessions.Options{
+		MaxAge: 60,
+	})
 	sess.Set("userId", user.Id)
 	err = sess.Save()
 	if err != nil {
 		ctx.String(http.StatusOK, "系统错误")
 	}
 	ctx.String(http.StatusOK, "登录成功")
+
 	return
 }
 
