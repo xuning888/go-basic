@@ -60,9 +60,9 @@ func initWebServer() *gin.Engine {
 	server.Use(sessions.Sessions("mysessions", store))
 
 	// 校验 session 的 middleware
-	server.Use(middleware.NewLoginMiddlewareBuilder().
-		IgnorePaths("/users/signup").
-		IgnorePaths("/users/login").
+	server.Use(middleware.NewLoginJWTMiddlewareBuilder().
+		Ignore("/users/signup").
+		Ignore("/users/login").
 		Build())
 
 	return server

@@ -4,6 +4,7 @@ import (
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	jwt "github.com/golang-jwt/jwt/v5"
 	"go-basic/webbook/internal/domain"
 	"go-basic/webbook/internal/service"
 	"go-basic/webbook/internal/util"
@@ -146,6 +147,54 @@ func (u *UserHandler) Login(ctx *gin.Context) {
 	return
 }
 
+// LoginJWT 用户登录
+func (u *UserHandler) LoginJWT(ctx *gin.Context) {
+
+	type loginReq struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	var req loginReq
+
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+
+	user, err := u.svc.Login(ctx, req.Email, req.Password)
+	if err == service.ErrInvalidUserOrPassword {
+		ctx.String(http.StatusOK, "用户名或密码不对")
+		return
+	}
+
+	if err != nil {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+
+	sess := sessions.Default(ctx)
+	// Secure 表示启用 HTTP, HttpOnly: 表示
+	sess.Options(sessions.Options{
+		MaxAge: 60,
+	})
+	sess.Set("userId", user.Id)
+	err = sess.Save()
+	if err != nil {
+		ctx.String(http.StatusOK, "系统错误")
+	}
+
+	token := jwt.New(jwt.SigningMethodHS512)
+	tokenStr, err := token.SignedString([]byte("MxQP9pSI6BzUL9XVSZrdSeJm6Jbhw42z"))
+
+	if err != nil {
+		ctx.String(http.StatusInternalServerError, "系统错误")
+		return
+	}
+	ctx.Header("x-jwt-token", tokenStr)
+	ctx.String(http.StatusOK, "登录成功")
+	return
+}
+
 // Edit 用户这是信息
 func (u *UserHandler) Edit(ctx *gin.Context) {
 	type EditReq struct {
@@ -273,7 +322,7 @@ func (u *UserHandler) Profile(ctx *gin.Context) {
 func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug := server.Group("/users")
 	ug.POST("/signup", u.SignUp)
-	ug.POST("/login", u.Login)
+	ug.POST("/login", u.LoginJWT)
 	ug.POST("/edit", u.Edit)
 	ug.GET("/profile", u.Profile)
 }
