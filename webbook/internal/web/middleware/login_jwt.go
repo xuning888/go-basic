@@ -66,6 +66,12 @@ func (l *LoginJWTMiddlewareBuilder) Build() gin.HandlerFunc {
 			return
 		}
 
+		if claims.UserAgent != ctx.Request.UserAgent() {
+			// 严重的安全问题
+			ctx.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+
 		now := time.Now()
 		// 过期时间 - 当前时间， 如果小于 10s, 那么就出发续约
 		if claims.ExpiresAt.Sub(now) < time.Second*50 {
