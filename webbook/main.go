@@ -5,11 +5,13 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
+	rc "github.com/redis/go-redis/v9"
 	"go-basic/webbook/internal/repository"
 	"go-basic/webbook/internal/repository/dao"
 	"go-basic/webbook/internal/service"
 	"go-basic/webbook/internal/web"
 	"go-basic/webbook/internal/web/middleware"
+	"go-basic/webbook/pkg/middlewares/ratelimit"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"log"
@@ -43,6 +45,12 @@ func initWebServer() *gin.Engine {
 		},
 		MaxAge: 12 * time.Hour,
 	}))
+
+	redisClient := rc.NewClient(&rc.Options{
+		Addr: "localhost:6379",
+	})
+
+	server.Use(ratelimit.NewBuilder(redisClient, time.Second, 100).Build())
 
 	// 基于内存的存储 session 的实现
 	// store := memstore.NewStore([]byte("sBvCQd28JynD7NWi"), []byte("DUVmChM4T3cAlNR8"))
