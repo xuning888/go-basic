@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webbook
+spec:
+  # 副本数量
+  replicas: 3
+  selector:
+    matchLabels:
+      app: webook
+  # 描述pod
+  template:
+    metadata:
+      name: webook
+      labels:
+        app: webook
+    # POD 的具体信息
+    spec:
+      containers:
+        - name: webook
+          image: xuning888/webook:v0.0.1
+          ports:
+            - containerPort: 8080

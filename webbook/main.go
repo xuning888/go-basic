@@ -15,6 +15,7 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"log"
+	"net/http"
 	"strings"
 	"time"
 )
@@ -24,6 +25,13 @@ func main() {
 	server := initWebServer()
 	userHandler := initUser(db)
 	userHandler.RegisterRoutes(server)
+
+	/*	server := gin.Default()*/
+
+	server.GET("/hello", func(ctx *gin.Context) {
+		ctx.String(http.StatusOK, "你好， 你来了")
+	})
+
 	log.Fatal(server.Run(":8080"))
 }
 
