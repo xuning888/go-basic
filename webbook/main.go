@@ -6,6 +6,7 @@ import (
 	"github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
 	rc "github.com/redis/go-redis/v9"
+	"go-basic/webbook/config"
 	"go-basic/webbook/internal/repository"
 	"go-basic/webbook/internal/repository/dao"
 	"go-basic/webbook/internal/service"
@@ -55,7 +56,7 @@ func initWebServer() *gin.Engine {
 	}))
 
 	redisClient := rc.NewClient(&rc.Options{
-		Addr: "localhost:6379",
+		Addr: config.Config.Redis.Add,
 	})
 
 	server.Use(ratelimit.NewBuilder(redisClient, time.Second, 100).Build())
@@ -67,7 +68,7 @@ func initWebServer() *gin.Engine {
 	// store := cookie.NewStore([]byte("secret"))
 
 	// 基于redis 来存储session
-	store, err := redis.NewStore(16, "tcp", "localhost:6379", "",
+	store, err := redis.NewStore(16, "tcp", config.Config.Redis.Add, "",
 		[]byte("MxQP9pSI6BzUL9XVSZrdSeJm6Jbhw42z"), []byte("0XCRv2ip2KMbnId8hT8UowhPc6yiTrhK"))
 	if err != nil {
 		panic(err)
@@ -93,7 +94,7 @@ func initUser(db *gorm.DB) *web.UserHandler {
 
 // initDB 初始化数据库
 func initDB() *gorm.DB {
-	db, err := gorm.Open(mysql.Open("root:09161549@tcp(localhost:3306)/webook"))
+	db, err := gorm.Open(mysql.Open(config.Config.Db.DSN))
 	if err != nil {
 		// 一旦初始化过程出错, 应用就不要启动
 		panic(err)

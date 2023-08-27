@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: webbook
+  name: webook
 spec:
   # 副本数量
   replicas: 3
@@ -18,6 +18,6 @@ spec:
     spec:
       containers:
         - name: webook
-          image: xuning888/webook:v0.0.1
+          image: xuning888/webook:v.0.0.1
           ports:
             - containerPort: 8080
