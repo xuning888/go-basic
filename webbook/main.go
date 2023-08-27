@@ -33,7 +33,7 @@ func main() {
 		ctx.String(http.StatusOK, "你好， 你来了")
 	})
 
-	log.Fatal(server.Run(":8080"))
+	log.Fatal(server.Run(":8081"))
 }
 
 // initWebServer 初始化 webServer
