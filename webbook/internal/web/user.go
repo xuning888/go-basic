@@ -4,11 +4,12 @@ import (
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
-	jwt "github.com/golang-jwt/jwt/v5"
+	"github.com/golang-jwt/jwt/v5"
 	"go-basic/webbook/internal/domain"
 	"go-basic/webbook/internal/service"
 	"go-basic/webbook/internal/util"
 	"net/http"
+	"time"
 )
 
 const (
@@ -183,7 +184,15 @@ func (u *UserHandler) LoginJWT(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "系统错误")
 	}
 
-	token := jwt.New(jwt.SigningMethodHS512)
+	claims := UserClaims{
+		// 设置过期时间
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 30)),
+		},
+		Uid: user.Id,
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
 	tokenStr, err := token.SignedString([]byte("MxQP9pSI6BzUL9XVSZrdSeJm6Jbhw42z"))
 
 	if err != nil {
@@ -318,11 +327,52 @@ func (u *UserHandler) Profile(ctx *gin.Context) {
 	return
 }
 
+// ProfileJWT 返回所有用户信息
+func (u *UserHandler) ProfileJWT(ctx *gin.Context) {
+	c, _ := ctx.Get("claims")
+
+	claims, ok := c.(*UserClaims)
+	if !ok {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+	userId := claims.Uid
+	profile, err := u.svc.Profile(ctx, userId)
+	if err == service.ErrUserNotFound {
+		ctx.String(http.StatusOK, "系统异常")
+		return
+	}
+	type ProfileRes struct {
+		Id           int64  `json:"id"`
+		Email        string `json:"email"`
+		Nickname     string `json:"nickname"`
+		Introduction string `json:"introduction"`
+		Birthday     string `json:"birthday"`
+	}
+
+	res := ProfileRes{
+		Id:           profile.Id,
+		Email:        profile.Email,
+		Nickname:     profile.NickName,
+		Introduction: profile.Introduction,
+		Birthday:     profile.Birthday,
+	}
+	ctx.JSON(http.StatusOK, res)
+	return
+}
+
 // RegisterRoutes 注册路由以及路由对应的处理方法
 func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug := server.Group("/users")
 	ug.POST("/signup", u.SignUp)
 	ug.POST("/login", u.LoginJWT)
 	ug.POST("/edit", u.Edit)
-	ug.GET("/profile", u.Profile)
+	ug.GET("/profile", u.ProfileJWT)
+}
+
+type UserClaims struct {
+	jwt.RegisteredClaims
+	// 声明我自己的要放到 token中的数据
+	Uid int64
+	// 自己随便加，但是不能放敏感信息
 }
