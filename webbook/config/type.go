@@ -1,8 +1,9 @@
 package config
 
 type config struct {
-	Db    DbConfig
-	Redis RedisConfig
+	Db          DbConfig
+	Redis       RedisConfig
+	EnableLimit bool
 }
 
 type DbConfig struct {

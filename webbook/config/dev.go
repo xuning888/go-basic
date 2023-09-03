@@ -9,4 +9,5 @@ var Config = config{
 	Redis: RedisConfig{
 		Add: "localhost:6379",
 	},
+	EnableLimit: false,
 }

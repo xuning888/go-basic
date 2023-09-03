@@ -9,4 +9,5 @@ var Config = config{
 	Redis: RedisConfig{
 		Add: "webook-redis:6380",
 	},
+	EnableLimit: true,
 }

@@ -55,11 +55,13 @@ func initWebServer() *gin.Engine {
 		MaxAge: 12 * time.Hour,
 	}))
 
-	redisClient := rc.NewClient(&rc.Options{
-		Addr: config.Config.Redis.Add,
-	})
-
-	server.Use(ratelimit.NewBuilder(redisClient, time.Second, 100).Build())
+	// 限流配置
+	if config.Config.EnableLimit {
+		redisClient := rc.NewClient(&rc.Options{
+			Addr: config.Config.Redis.Add,
+		})
+		server.Use(ratelimit.NewBuilder(redisClient, time.Second, 100).Build())
+	}
 
 	// 基于内存的存储 session 的实现
 	// store := memstore.NewStore([]byte("sBvCQd28JynD7NWi"), []byte("DUVmChM4T3cAlNR8"))
