@@ -8,6 +8,7 @@ import (
 	rc "github.com/redis/go-redis/v9"
 	"go-basic/webbook/config"
 	"go-basic/webbook/internal/repository"
+	"go-basic/webbook/internal/repository/cache"
 	"go-basic/webbook/internal/repository/dao"
 	"go-basic/webbook/internal/service"
 	"go-basic/webbook/internal/web"
@@ -57,9 +58,7 @@ func initWebServer() *gin.Engine {
 
 	// 限流配置
 	if config.Config.EnableLimit {
-		redisClient := rc.NewClient(&rc.Options{
-			Addr: config.Config.Redis.Add,
-		})
+		redisClient := initRedis()
 		server.Use(ratelimit.NewBuilder(redisClient, time.Second, 100).Build())
 	}
 
@@ -89,7 +88,9 @@ func initWebServer() *gin.Engine {
 
 func initUser(db *gorm.DB) *web.UserHandler {
 	userDAO := dao.NewUserDAO(db)
-	repo := repository.NewUserRepository(userDAO)
+	redisClient := initRedis()
+	userCache := cache.NewUserCache(redisClient, time.Minute*15)
+	repo := repository.NewUserRepository(userDAO, userCache)
 	userService := service.NewUserService(repo)
 	return web.NewUserHandler(userService)
 }
@@ -106,4 +107,12 @@ func initDB() *gorm.DB {
 		panic(err)
 	}
 	return db
+}
+
+// initRedis TODO, 这个应该是单例的
+func initRedis() rc.Cmdable {
+	redisClient := rc.NewClient(&rc.Options{
+		Addr: config.Config.Redis.Add,
+	})
+	return redisClient
 }
