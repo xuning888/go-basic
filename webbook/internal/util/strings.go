@@ -21,3 +21,7 @@ func RandomString(length int) string {
 	}
 	return string(randomBytes)
 }
+
+func ToPtr[T any](t T) *T {
+	return &t
+}
