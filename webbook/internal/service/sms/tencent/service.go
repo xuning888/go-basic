@@ -8,10 +8,36 @@ import (
 	"go-basic/webbook/internal/util"
 )
 
+var _ mysms.Service = &Service{}
+
 type Service struct {
 	appId     *string
 	signature *string
 	client    *sms.Client
+}
+
+func (s *Service) SendV1(ctx context.Context, tpl string, numbers []string, args []mysms.NamedArg) error {
+
+	req := sms.NewSendSmsRequest()
+	req.SmsSdkAppId = s.appId
+	req.SignName = s.signature
+	req.TemplateId = util.ToPtr[string](tpl)
+	req.PhoneNumberSet = s.toStringPtrSlice(numbers)
+	req.TemplateParamSet = util.Map[mysms.NamedArg, *string](args, func(idx int, src mysms.NamedArg) *string {
+		return util.ToPtr[string](src.Val)
+	})
+	resp, err := s.client.SendSms(req)
+	if err != nil {
+		return err
+	}
+
+	// TODO, 批量发送之后返回批量错误 暂时不用管
+	for _, status := range resp.Response.SendStatusSet {
+		if status.Code == nil || *(status.Code) != "Ok" {
+			return fmt.Errorf("发送短信失败 %s, %s", *status.Code, *status.Message)
+		}
+	}
+	return nil
 }
 
 func NewService() mysms.Service {
