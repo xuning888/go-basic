@@ -34,9 +34,10 @@ type UserHandler struct {
 	birthdayExp     *regexp.Regexp
 	introductionExp *regexp.Regexp
 	svc             *service.UserService
+	codeSvc         *service.CodeService
 }
 
-func NewUserHandler(svc *service.UserService) *UserHandler {
+func NewUserHandler(svc *service.UserService, codeSvc *service.CodeService) *UserHandler {
 	// 将正则表达式的预编译放到 UserHandler的初始化中
 	return &UserHandler{
 		emailExp:        regexp.MustCompile(emailRegexPattern, regexp.None),
@@ -45,6 +46,7 @@ func NewUserHandler(svc *service.UserService) *UserHandler {
 		birthdayExp:     regexp.MustCompile(birthdayRegexPattern, regexp.None),
 		introductionExp: regexp.MustCompile(introductionRegexPattern, regexp.None),
 		svc:             svc,
+		codeSvc:         codeSvc,
 	}
 }
 
@@ -362,6 +364,34 @@ func (u *UserHandler) ProfileJWT(ctx *gin.Context) {
 	return
 }
 
+func (u *UserHandler) SendLoginSmsCode(ctx *gin.Context) {
+	const biz = "login"
+	type Req struct {
+		Phone string `json:"phone"`
+	}
+
+	var req Req
+
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+	phone := req.Phone
+	err := u.codeSvc.Send(ctx, biz, phone)
+
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, Result{
+		Msg: "发送成功",
+	})
+	return
+}
+
 // RegisterRoutes 注册路由以及路由对应的处理方法
 func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug := server.Group("/users")
@@ -369,6 +399,7 @@ func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug.POST("/login", u.LoginJWT)
 	ug.POST("/edit", u.Edit)
 	ug.GET("/profile", u.ProfileJWT)
+	ug.POST("/login_sms/code/send", u.SendLoginSmsCode)
 }
 
 type UserClaims struct {

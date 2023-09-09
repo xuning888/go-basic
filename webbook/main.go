@@ -11,6 +11,7 @@ import (
 	"go-basic/webbook/internal/repository/cache"
 	"go-basic/webbook/internal/repository/dao"
 	"go-basic/webbook/internal/service"
+	"go-basic/webbook/internal/service/sms/memory"
 	"go-basic/webbook/internal/web"
 	"go-basic/webbook/internal/web/middleware"
 	"go-basic/webbook/pkg/middlewares/ratelimit"
@@ -34,7 +35,7 @@ func main() {
 		ctx.String(http.StatusOK, "你好， 你来了")
 	})
 
-	log.Fatal(server.Run(":8081"))
+	log.Fatal(server.Run(":8080"))
 }
 
 // initWebServer 初始化 webServer
@@ -81,6 +82,7 @@ func initWebServer() *gin.Engine {
 	server.Use(middleware.NewLoginJWTMiddlewareBuilder().
 		Ignore("/users/signup").
 		Ignore("/users/login").
+		Ignore("/users/login_sms/code/send").
 		Build())
 
 	return server
@@ -92,7 +94,12 @@ func initUser(db *gorm.DB) *web.UserHandler {
 	userCache := cache.NewUserCache(redisClient, time.Minute*15)
 	repo := repository.NewUserRepository(userDAO, userCache)
 	userService := service.NewUserService(repo)
-	return web.NewUserHandler(userService)
+
+	codeCache := cache.NewRedisCodeCache(redisClient)
+	codeRepository := repository.NewCodeRepository(codeCache)
+	memService := memory.NewMemService()
+	codeService := service.NewCodeService(codeRepository, memService)
+	return web.NewUserHandler(userService, codeService)
 }
 
 // initDB 初始化数据库
