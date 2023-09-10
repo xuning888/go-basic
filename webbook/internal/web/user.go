@@ -23,6 +23,7 @@ const (
 	birthdayRegexPattern = `^\d{4}-\d{2}-\d{2}$`
 	// 自我介绍不能超过 500 个字符
 	introductionRegexPattern = `^.{1,500}$`
+	biz                      = "login"
 )
 
 // UserHandler 定义所有跟用户有关的路由
@@ -33,11 +34,11 @@ type UserHandler struct {
 	nicknameExp     *regexp.Regexp
 	birthdayExp     *regexp.Regexp
 	introductionExp *regexp.Regexp
-	svc             *service.UserService
-	codeSvc         *service.CodeService
+	svc             service.UserService
+	codeSvc         service.CodeService
 }
 
-func NewUserHandler(svc *service.UserService, codeSvc *service.CodeService) *UserHandler {
+func NewUserHandler(svc service.UserService, codeSvc service.CodeService) *UserHandler {
 	// 将正则表达式的预编译放到 UserHandler的初始化中
 	return &UserHandler{
 		emailExp:        regexp.MustCompile(emailRegexPattern, regexp.None),
@@ -186,12 +187,24 @@ func (u *UserHandler) LoginJWT(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "系统错误")
 	}
 
+	err = u.setJwtToken(ctx, user.Id)
+
+	if err != nil {
+		ctx.String(http.StatusInternalServerError, "系统错误")
+		return
+	}
+
+	ctx.String(http.StatusOK, "登录成功")
+	return
+}
+
+func (u *UserHandler) setJwtToken(ctx *gin.Context, id int64) error {
 	claims := UserClaims{
 		// 设置过期时间
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 30)),
 		},
-		Uid:       user.Id,
+		Uid:       id,
 		UserAgent: ctx.Request.UserAgent(),
 	}
 
@@ -199,12 +212,10 @@ func (u *UserHandler) LoginJWT(ctx *gin.Context) {
 	tokenStr, err := token.SignedString([]byte("MxQP9pSI6BzUL9XVSZrdSeJm6Jbhw42z"))
 
 	if err != nil {
-		ctx.String(http.StatusInternalServerError, "系统错误")
-		return
+		return err
 	}
 	ctx.Header("x-jwt-token", tokenStr)
-	ctx.String(http.StatusOK, "登录成功")
-	return
+	return nil
 }
 
 // Edit 用户这是信息
@@ -365,7 +376,6 @@ func (u *UserHandler) ProfileJWT(ctx *gin.Context) {
 }
 
 func (u *UserHandler) SendLoginSmsCode(ctx *gin.Context) {
-	const biz = "login"
 	type Req struct {
 		Phone string `json:"phone"`
 	}
@@ -392,6 +402,57 @@ func (u *UserHandler) SendLoginSmsCode(ctx *gin.Context) {
 	return
 }
 
+func (u *UserHandler) LoginSms(ctx *gin.Context) {
+
+	type Req struct {
+		Phone string `json:"phone"`
+		Code  string `json:"code"`
+	}
+
+	var req Req
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+
+	verify, err := u.codeSvc.Verify(ctx, biz, req.Phone, req.Code)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  err.Error(),
+		})
+		return
+	}
+
+	if !verify {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 4,
+			Msg:  "验证码有误",
+		})
+		return
+	}
+
+	user, err := u.svc.FindOrCreate(ctx, req.Phone)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		return
+	}
+
+	if err = u.setJwtToken(ctx, user.Id); err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, Result{
+		Msg: "验证码验证通过",
+	})
+}
+
 // RegisterRoutes 注册路由以及路由对应的处理方法
 func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug := server.Group("/users")
@@ -400,6 +461,7 @@ func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug.POST("/edit", u.Edit)
 	ug.GET("/profile", u.ProfileJWT)
 	ug.POST("/login_sms/code/send", u.SendLoginSmsCode)
+	ug.POST("/login_sms", u.LoginSms)
 }
 
 type UserClaims struct {

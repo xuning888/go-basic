@@ -6,6 +6,7 @@ import "golang.org/x/crypto/bcrypt"
 type User struct {
 	Id           int64
 	Email        string
+	Phone        string
 	Password     string
 	NickName     string
 	Birthday     string
