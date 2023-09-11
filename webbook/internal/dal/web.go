@@ -36,6 +36,7 @@ func jwtMiddleware() gin.HandlerFunc {
 		Ignore("/users/login").
 		Ignore("/users/login_sms/code/send").
 		Ignore("/users/login_sms").
+		Ignore("/hello").
 		Build()
 }
 
