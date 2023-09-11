@@ -44,6 +44,23 @@ func TestUserHandler_SignUp(t *testing.T) {
 			wantCode: 200,
 			wantBody: "注册成功",
 		},
+		{
+			name: "邮箱格式错误",
+			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+				return nil, nil
+			},
+			reqBuilder: func(t *testing.T) *http.Request {
+				reqBody := bytes.NewBuffer([]byte(`{"email": "123@","password": "hello@world123","confirmPassword": "hello@world123"}`))
+				request, err := http.NewRequest(http.MethodPost, signupUrl, reqBody)
+				request.Header.Set("Content-Type", "application/json")
+				if err != nil {
+					t.Fatal(err)
+				}
+				return request
+			},
+			wantCode: 200,
+			wantBody: "邮箱格式错误",
+		},
 	}
 
 	for _, tc := range testCases {
